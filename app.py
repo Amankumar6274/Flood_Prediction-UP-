@@ -490,30 +490,95 @@ with col_b:
 st.markdown("---")
 predict_button = st.button("Predict Flood Risk")
 
+# if predict_button:
+#     if model is None or preprocessor is None:
+#         st.error("Model or preprocessor not loaded properly.")
+#     else:
+#         # Prepare input features
+#         input_data = {
+#             'rainfall_mm': rainfall_mm,
+#             'temperature_C': temperature_C,
+#             'soil_moisture': soil_moisture,
+#             'river_level_m': river_level_m,
+#             'current_dam_level_m': current_dam_level_m,
+#             'danger_level_m': 10.0,  # default placeholder
+#             'release_status': release_status,
+#             'district': selected_district,
+#             'river': selected_river
+#         }
+
+#         # Generate lagged features (simplified: replicate current value)
+#         for i in range(1, N_TIMESTEPS - 1):
+#             input_data[f'rainfall_mm_lag{i}'] = rainfall_mm
+#             input_data[f'temperature_C_lag{i}'] = temperature_C
+#             input_data[f'soil_moisture_lag{i}'] = soil_moisture
+#             input_data[f'river_level_m_lag{i}'] = river_level_m
+#             input_data[f'current_dam_level_m_lag{i}'] = current_dam_level_m
+#         input_data['release_status_lag1'] = release_status
+
+#         # Aggregate rainfall sums
+#         input_data['rainfall_7day_sum'] = rainfall_mm * 7
+#         input_data['rainfall_15day_sum'] = rainfall_mm * 15
+#         input_data['rainfall_30day_sum'] = rainfall_mm * 30
+
+#         # Cyclical date features
+#         day_of_year = selected_date.timetuple().tm_yday
+#         month = selected_date.month
+#         input_data['day_of_year_sin'] = np.sin(2 * np.pi * day_of_year / 365)
+#         input_data['day_of_year_cos'] = np.cos(2 * np.pi * day_of_year / 365)
+#         input_data['month_sin'] = np.sin(2 * np.pi * month / 12)
+#         input_data['month_cos'] = np.cos(2 * np.pi * month / 12)
+
+#         # Create DataFrame with feature order matching training
+#         current_features_raw = {k: input_data[k] for k in numerical_features + categorical_features}
+#         input_df = pd.DataFrame([current_features_raw])
+
+#         try:
+#             processed_input = preprocessor.transform(input_df)
+#             processed_input_df = pd.DataFrame(processed_input, columns=all_feature_names)
+#         except Exception as e:
+#             st.error(f"Error during preprocessing: {e}")
+#             st.stop()
+
+#         # Reshape for GRU model: (1, N_TIMESTEPS, num_features)
+#         num_features_after_preprocessing = processed_input_df.shape[1]
+#         model_input = np.repeat(processed_input_df.values, N_TIMESTEPS, axis=0).reshape(1, N_TIMESTEPS, num_features_after_preprocessing)
+
+#         # Predict flood risk probability
+#         pred_prob = model.predict(model_input)[0][0]
+#         pred_class = int(pred_prob >= 0.5)
+
+#         st.markdown("---")
+#         st.subheader("Prediction Result:")
+#         risk_label = "High Flood Risk" if pred_class == 1 else "Low Flood Risk"
+#         risk_color = "red" if pred_class == 1 else "green"
+#         st.markdown(f"<h2 style='color:{risk_color};'>{risk_label}</h2>", unsafe_allow_html=True)
+#         st.write(f"Flood Risk Probability: {pred_prob:.2%}")
 if predict_button:
     if model is None or preprocessor is None:
         st.error("Model or preprocessor not loaded properly.")
     else:
-        # Prepare input features
+        # Prepare input features dictionary
         input_data = {
             'rainfall_mm': rainfall_mm,
             'temperature_C': temperature_C,
             'soil_moisture': soil_moisture,
             'river_level_m': river_level_m,
             'current_dam_level_m': current_dam_level_m,
-            'danger_level_m': 10.0,  # default placeholder
+            'danger_level_m': 10.0,  # placeholder, ideally user input or computed
             'release_status': release_status,
             'district': selected_district,
             'river': selected_river
         }
 
-        # Generate lagged features (simplified: replicate current value)
-        for i in range(1, N_TIMESTEPS - 1):
+        # Correct lag feature generation for lag1, lag2, lag3 explicitly
+        for i in range(1, 4):  # lag1 to lag3 inclusive
             input_data[f'rainfall_mm_lag{i}'] = rainfall_mm
             input_data[f'temperature_C_lag{i}'] = temperature_C
             input_data[f'soil_moisture_lag{i}'] = soil_moisture
             input_data[f'river_level_m_lag{i}'] = river_level_m
             input_data[f'current_dam_level_m_lag{i}'] = current_dam_level_m
+        # release_status_lag1 only
         input_data['release_status_lag1'] = release_status
 
         # Aggregate rainfall sums
@@ -529,9 +594,12 @@ if predict_button:
         input_data['month_sin'] = np.sin(2 * np.pi * month / 12)
         input_data['month_cos'] = np.cos(2 * np.pi * month / 12)
 
-        # Create DataFrame with feature order matching training
+        # Ensure order and keys match exactly the preprocessor expected columns
         current_features_raw = {k: input_data[k] for k in numerical_features + categorical_features}
         input_df = pd.DataFrame([current_features_raw])
+
+        st.write("Input DataFrame columns:", input_df.columns.tolist())
+        st.write("Input DataFrame shape:", input_df.shape)
 
         try:
             processed_input = preprocessor.transform(input_df)
@@ -540,11 +608,15 @@ if predict_button:
             st.error(f"Error during preprocessing: {e}")
             st.stop()
 
-        # Reshape for GRU model: (1, N_TIMESTEPS, num_features)
+        st.write("Processed DataFrame shape:", processed_input_df.shape)
+
+        # Prepare input for GRU model: repeat row for N_TIMESTEPS to create 3D input
         num_features_after_preprocessing = processed_input_df.shape[1]
         model_input = np.repeat(processed_input_df.values, N_TIMESTEPS, axis=0).reshape(1, N_TIMESTEPS, num_features_after_preprocessing)
 
-        # Predict flood risk probability
+        st.write("Model input shape:", model_input.shape)
+
+        # Prediction
         pred_prob = model.predict(model_input)[0][0]
         pred_class = int(pred_prob >= 0.5)
 
