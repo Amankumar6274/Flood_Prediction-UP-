@@ -395,6 +395,249 @@
 
 
 
+# import streamlit as st
+# import pandas as pd
+# import numpy as np
+# import datetime
+# import joblib
+# from tensorflow.keras.models import load_model
+
+# # --- Configuration for Districts and Rivers (must match training data) ---
+# all_districts_rivers = [
+#     ("Agra", "Yamuna"), ("Aligarh", "Ganga"), ("Ambedkar Nagar", "Ghaghara"), ("Amethi", "Gomti"),
+#     ("Azamgarh", "Ghaghara"), ("Bahraich", "Ghaghara"), ("Ballia", "Ganga"), ("Balrampur", "Rapti"),
+#     ("Barabanki", "Ghaghara"), ("Basti", "Rapti"), ("Budaun", "Ganga"), ("Faizabad (Ayodhya)", "Ghaghara"),
+#     ("Farrukhabad", "Ganga"), ("Fatehpur", "Ganga"), ("Ghazipur", "Ganga"), ("Gonda", "Ghaghara"),
+#     ("Gorakhpur", "Rapti"), ("Hardoi", "Ganga"), ("Jalaun", "Betwa"), ("Jaunpur", "Gomti"),
+#     ("Kannauj", "Ganga"), ("Kanpur Nagar", "Ganga"), ("Kushinagar", "Gandak"), ("Lakhimpur Kheri", "Sharda"),
+#     ("Lucknow", "Gomti"), ("Maharajganj", "Rapti"), ("Mainpuri", "Yamuna"), ("Mau", "Ghaghara"),
+#     ("Meerut", "Hindon"), ("Mirzapur", "Ganga"), ("Mirzapur", "Son"),
+#     ("Muzaffarnagar", "Ganga"), ("Pilibhit", "Sharda"),
+#     ("Pratapgarh", "Ganga"), ("Prayagraj", "Ganga"), ("Rae Bareli", "Ganga"), ("Rampur", "Ramganga"),
+#     ("Saharanpur", "Yamuna"), ("Sant Kabir Nagar", "Rapti"), ("Shahjahanpur", "Ramganga"), ("Shrawasti", "Rapti"),
+#     ("Siddharthnagar", "Rapti"), ("Sitapur", "Sharda"), ("Sultanpur", "Gomti"), ("Unnao", "Ganga"),
+#     ("Varanasi", "Ganga")
+# ]
+# unique_districts = sorted(list(set([d for d, r in all_districts_rivers])))
+# unique_rivers = sorted(list(set([r for d, r in all_districts_rivers])))
+
+# # --- Load Model and Preprocessor ---
+# @st.cache_resource
+# def load_assets():
+#     try:
+#         model = load_model('gru_flood_model.h5')
+#         preprocessor = joblib.load('preprocessor.joblib')
+#         return model, preprocessor
+#     except Exception as e:
+#         st.error(f"Error loading model or preprocessor: {e}")
+#         return None, None
+
+# model, preprocessor = load_assets()
+
+# # --- Constants ---
+# N_TIMESTEPS = 5
+
+# numerical_features = [
+#     'rainfall_mm', 'temperature_C', 'soil_moisture', 'river_level_m',
+#     'current_dam_level_m', 'danger_level_m', 'release_status',
+#     'rainfall_mm_lag1', 'rainfall_mm_lag2', 'rainfall_mm_lag3',
+#     'river_level_m_lag1', 'river_level_m_lag2', 'river_level_m_lag3',
+#     'temperature_C_lag1', 'temperature_C_lag2', 'temperature_C_lag3',
+#     'soil_moisture_lag1', 'soil_moisture_lag2', 'soil_moisture_lag3',
+#     'current_dam_level_m_lag1', 'current_dam_level_m_lag2', 'current_dam_level_m_lag3',
+#     'release_status_lag1',
+#     'rainfall_7day_sum', 'rainfall_15day_sum', 'rainfall_30day_sum',
+#     'day_of_year_sin', 'day_of_year_cos', 'month_sin', 'month_cos'
+# ]
+# categorical_features = ['district', 'river']
+
+# # if preprocessor:
+# #     # Set categories explicitly for OneHotEncoder to avoid mismatch
+# #     preprocessor.named_transformers_['cat'].categories_ = [unique_districts, unique_rivers]
+# #     # Get OneHotEncoder feature names
+# #     ohe_feature_names = preprocessor.named_transformers_['cat'].get_feature_names_out(categorical_features)
+# #     all_feature_names = numerical_features + list(ohe_feature_names)
+# # else:
+# #     all_feature_names = []
+
+# if preprocessor:
+#     cat_transformer = preprocessor.named_transformers_['cat']
+#     # Don't override categories manually
+#     # Just use the original fitted categories and get feature names
+#     ohe_feature_names = cat_transformer.get_feature_names_out(categorical_features)
+#     all_feature_names = numerical_features + list(ohe_feature_names)
+# else:
+#     all_feature_names = []
+
+
+# # --- Streamlit UI ---
+# st.title("Uttar Pradesh Flood Risk Predictor 🌊")
+# st.markdown("---")
+# st.write("Enter current weather and river conditions for a specific location and date to predict flood risk.")
+
+# st.header("1. Select Location & Date")
+# col1, col2, col3 = st.columns(3)
+# with col1:
+#     selected_district = st.selectbox("Select District:", unique_districts)
+# with col2:
+#     selected_river = st.selectbox("Select River:", unique_rivers)
+# with col3:
+#     selected_date = st.date_input("Date for Prediction:", value=datetime.date.today())
+
+# st.header("2. Enter Current Day's Conditions")
+# col_a, col_b = st.columns(2)
+# with col_a:
+#     rainfall_mm = st.number_input("Rainfall (mm):", min_value=0.0, value=10.0, step=1.0)
+#     soil_moisture = st.number_input("Soil Moisture (0-1):", min_value=0.0, max_value=1.0, value=0.5, step=0.01)
+#     current_dam_level_m = st.number_input("Current Dam Level (m):", min_value=0.0, value=15.0, step=0.1)
+#     release_status_input = st.selectbox("Dam Release Status:", ["No Release", "Release"])
+#     release_status = 1 if release_status_input == "Release" else 0
+
+# with col_b:
+#     temperature_C = st.number_input("Temperature (°C):", min_value=-20.0, max_value=50.0, value=25.0, step=0.1)
+#     river_level_m = st.number_input("River Level (m):", min_value=0.0, value=5.0, step=0.1)
+
+# st.markdown("---")
+# predict_button = st.button("Predict Flood Risk")
+
+# # if predict_button:
+# #     if model is None or preprocessor is None:
+# #         st.error("Model or preprocessor not loaded properly.")
+# #     else:
+# #         # Prepare input features
+# #         input_data = {
+# #             'rainfall_mm': rainfall_mm,
+# #             'temperature_C': temperature_C,
+# #             'soil_moisture': soil_moisture,
+# #             'river_level_m': river_level_m,
+# #             'current_dam_level_m': current_dam_level_m,
+# #             'danger_level_m': 10.0,  # default placeholder
+# #             'release_status': release_status,
+# #             'district': selected_district,
+# #             'river': selected_river
+# #         }
+
+# #         # Generate lagged features (simplified: replicate current value)
+# #         for i in range(1, N_TIMESTEPS - 1):
+# #             input_data[f'rainfall_mm_lag{i}'] = rainfall_mm
+# #             input_data[f'temperature_C_lag{i}'] = temperature_C
+# #             input_data[f'soil_moisture_lag{i}'] = soil_moisture
+# #             input_data[f'river_level_m_lag{i}'] = river_level_m
+# #             input_data[f'current_dam_level_m_lag{i}'] = current_dam_level_m
+# #         input_data['release_status_lag1'] = release_status
+
+# #         # Aggregate rainfall sums
+# #         input_data['rainfall_7day_sum'] = rainfall_mm * 7
+# #         input_data['rainfall_15day_sum'] = rainfall_mm * 15
+# #         input_data['rainfall_30day_sum'] = rainfall_mm * 30
+
+# #         # Cyclical date features
+# #         day_of_year = selected_date.timetuple().tm_yday
+# #         month = selected_date.month
+# #         input_data['day_of_year_sin'] = np.sin(2 * np.pi * day_of_year / 365)
+# #         input_data['day_of_year_cos'] = np.cos(2 * np.pi * day_of_year / 365)
+# #         input_data['month_sin'] = np.sin(2 * np.pi * month / 12)
+# #         input_data['month_cos'] = np.cos(2 * np.pi * month / 12)
+
+# #         # Create DataFrame with feature order matching training
+# #         current_features_raw = {k: input_data[k] for k in numerical_features + categorical_features}
+# #         input_df = pd.DataFrame([current_features_raw])
+
+# #         try:
+# #             processed_input = preprocessor.transform(input_df)
+# #             processed_input_df = pd.DataFrame(processed_input, columns=all_feature_names)
+# #         except Exception as e:
+# #             st.error(f"Error during preprocessing: {e}")
+# #             st.stop()
+
+# #         # Reshape for GRU model: (1, N_TIMESTEPS, num_features)
+# #         num_features_after_preprocessing = processed_input_df.shape[1]
+# #         model_input = np.repeat(processed_input_df.values, N_TIMESTEPS, axis=0).reshape(1, N_TIMESTEPS, num_features_after_preprocessing)
+
+# #         # Predict flood risk probability
+# #         pred_prob = model.predict(model_input)[0][0]
+# #         pred_class = int(pred_prob >= 0.5)
+
+# #         st.markdown("---")
+# #         st.subheader("Prediction Result:")
+# #         risk_label = "High Flood Risk" if pred_class == 1 else "Low Flood Risk"
+# #         risk_color = "red" if pred_class == 1 else "green"
+# #         st.markdown(f"<h2 style='color:{risk_color};'>{risk_label}</h2>", unsafe_allow_html=True)
+# #         st.write(f"Flood Risk Probability: {pred_prob:.2%}")
+# if predict_button:
+#     if model is None or preprocessor is None:
+#         st.error("Model or preprocessor not loaded properly.")
+#     else:
+#         # Prepare input features dictionary
+#         input_data = {
+#             'rainfall_mm': rainfall_mm,
+#             'temperature_C': temperature_C,
+#             'soil_moisture': soil_moisture,
+#             'river_level_m': river_level_m,
+#             'current_dam_level_m': current_dam_level_m,
+#             'danger_level_m': 10.0,  # placeholder, ideally user input or computed
+#             'release_status': release_status,
+#             'district': selected_district,
+#             'river': selected_river
+#         }
+
+#         # Correct lag feature generation for lag1, lag2, lag3 explicitly
+#         for i in range(1, 4):  # lag1 to lag3 inclusive
+#             input_data[f'rainfall_mm_lag{i}'] = rainfall_mm
+#             input_data[f'temperature_C_lag{i}'] = temperature_C
+#             input_data[f'soil_moisture_lag{i}'] = soil_moisture
+#             input_data[f'river_level_m_lag{i}'] = river_level_m
+#             input_data[f'current_dam_level_m_lag{i}'] = current_dam_level_m
+#         # release_status_lag1 only
+#         input_data['release_status_lag1'] = release_status
+
+#         # Aggregate rainfall sums
+#         input_data['rainfall_7day_sum'] = rainfall_mm * 7
+#         input_data['rainfall_15day_sum'] = rainfall_mm * 15
+#         input_data['rainfall_30day_sum'] = rainfall_mm * 30
+
+#         # Cyclical date features
+#         day_of_year = selected_date.timetuple().tm_yday
+#         month = selected_date.month
+#         input_data['day_of_year_sin'] = np.sin(2 * np.pi * day_of_year / 365)
+#         input_data['day_of_year_cos'] = np.cos(2 * np.pi * day_of_year / 365)
+#         input_data['month_sin'] = np.sin(2 * np.pi * month / 12)
+#         input_data['month_cos'] = np.cos(2 * np.pi * month / 12)
+
+#         # Ensure order and keys match exactly the preprocessor expected columns
+#         current_features_raw = {k: input_data[k] for k in numerical_features + categorical_features}
+#         input_df = pd.DataFrame([current_features_raw])
+
+#         st.write("Input DataFrame columns:", input_df.columns.tolist())
+#         st.write("Input DataFrame shape:", input_df.shape)
+
+#         try:
+#             processed_input = preprocessor.transform(input_df)
+#             processed_input_df = pd.DataFrame(processed_input, columns=all_feature_names)
+#         except Exception as e:
+#             st.error(f"Error during preprocessing: {e}")
+#             st.stop()
+
+#         st.write("Processed DataFrame shape:", processed_input_df.shape)
+
+#         # Prepare input for GRU model: repeat row for N_TIMESTEPS to create 3D input
+#         num_features_after_preprocessing = processed_input_df.shape[1]
+#         model_input = np.repeat(processed_input_df.values, N_TIMESTEPS, axis=0).reshape(1, N_TIMESTEPS, num_features_after_preprocessing)
+
+#         st.write("Model input shape:", model_input.shape)
+
+#         # Prediction
+#         pred_prob = model.predict(model_input)[0][0]
+#         pred_class = int(pred_prob >= 0.5)
+
+#         st.markdown("---")
+#         st.subheader("Prediction Result:")
+#         risk_label = "High Flood Risk" if pred_class == 1 else "Low Flood Risk"
+#         risk_color = "red" if pred_class == 1 else "green"
+#         st.markdown(f"<h2 style='color:{risk_color};'>{risk_label}</h2>", unsafe_allow_html=True)
+#         st.write(f"Flood Risk Probability: {pred_prob:.2%}")
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -402,7 +645,7 @@ import datetime
 import joblib
 from tensorflow.keras.models import load_model
 
-# --- Configuration for Districts and Rivers (must match training data) ---
+# --- Configuration for Districts and Rivers ---
 all_districts_rivers = [
     ("Agra", "Yamuna"), ("Aligarh", "Ganga"), ("Ambedkar Nagar", "Ghaghara"), ("Amethi", "Gomti"),
     ("Azamgarh", "Ghaghara"), ("Bahraich", "Ghaghara"), ("Ballia", "Ganga"), ("Balrampur", "Rapti"),
@@ -436,7 +679,6 @@ model, preprocessor = load_assets()
 
 # --- Constants ---
 N_TIMESTEPS = 5
-
 numerical_features = [
     'rainfall_mm', 'temperature_C', 'soil_moisture', 'river_level_m',
     'current_dam_level_m', 'danger_level_m', 'release_status',
@@ -451,24 +693,11 @@ numerical_features = [
 ]
 categorical_features = ['district', 'river']
 
-# if preprocessor:
-#     # Set categories explicitly for OneHotEncoder to avoid mismatch
-#     preprocessor.named_transformers_['cat'].categories_ = [unique_districts, unique_rivers]
-#     # Get OneHotEncoder feature names
-#     ohe_feature_names = preprocessor.named_transformers_['cat'].get_feature_names_out(categorical_features)
-#     all_feature_names = numerical_features + list(ohe_feature_names)
-# else:
-#     all_feature_names = []
-
 if preprocessor:
-    cat_transformer = preprocessor.named_transformers_['cat']
-    # Don't override categories manually
-    # Just use the original fitted categories and get feature names
-    ohe_feature_names = cat_transformer.get_feature_names_out(categorical_features)
+    ohe_feature_names = preprocessor.named_transformers_['cat'].get_feature_names_out(categorical_features)
     all_feature_names = numerical_features + list(ohe_feature_names)
 else:
     all_feature_names = []
-
 
 # --- Streamlit UI ---
 st.title("Uttar Pradesh Flood Risk Predictor 🌊")
@@ -500,98 +729,34 @@ with col_b:
 st.markdown("---")
 predict_button = st.button("Predict Flood Risk")
 
-# if predict_button:
-#     if model is None or preprocessor is None:
-#         st.error("Model or preprocessor not loaded properly.")
-#     else:
-#         # Prepare input features
-#         input_data = {
-#             'rainfall_mm': rainfall_mm,
-#             'temperature_C': temperature_C,
-#             'soil_moisture': soil_moisture,
-#             'river_level_m': river_level_m,
-#             'current_dam_level_m': current_dam_level_m,
-#             'danger_level_m': 10.0,  # default placeholder
-#             'release_status': release_status,
-#             'district': selected_district,
-#             'river': selected_river
-#         }
-
-#         # Generate lagged features (simplified: replicate current value)
-#         for i in range(1, N_TIMESTEPS - 1):
-#             input_data[f'rainfall_mm_lag{i}'] = rainfall_mm
-#             input_data[f'temperature_C_lag{i}'] = temperature_C
-#             input_data[f'soil_moisture_lag{i}'] = soil_moisture
-#             input_data[f'river_level_m_lag{i}'] = river_level_m
-#             input_data[f'current_dam_level_m_lag{i}'] = current_dam_level_m
-#         input_data['release_status_lag1'] = release_status
-
-#         # Aggregate rainfall sums
-#         input_data['rainfall_7day_sum'] = rainfall_mm * 7
-#         input_data['rainfall_15day_sum'] = rainfall_mm * 15
-#         input_data['rainfall_30day_sum'] = rainfall_mm * 30
-
-#         # Cyclical date features
-#         day_of_year = selected_date.timetuple().tm_yday
-#         month = selected_date.month
-#         input_data['day_of_year_sin'] = np.sin(2 * np.pi * day_of_year / 365)
-#         input_data['day_of_year_cos'] = np.cos(2 * np.pi * day_of_year / 365)
-#         input_data['month_sin'] = np.sin(2 * np.pi * month / 12)
-#         input_data['month_cos'] = np.cos(2 * np.pi * month / 12)
-
-#         # Create DataFrame with feature order matching training
-#         current_features_raw = {k: input_data[k] for k in numerical_features + categorical_features}
-#         input_df = pd.DataFrame([current_features_raw])
-
-#         try:
-#             processed_input = preprocessor.transform(input_df)
-#             processed_input_df = pd.DataFrame(processed_input, columns=all_feature_names)
-#         except Exception as e:
-#             st.error(f"Error during preprocessing: {e}")
-#             st.stop()
-
-#         # Reshape for GRU model: (1, N_TIMESTEPS, num_features)
-#         num_features_after_preprocessing = processed_input_df.shape[1]
-#         model_input = np.repeat(processed_input_df.values, N_TIMESTEPS, axis=0).reshape(1, N_TIMESTEPS, num_features_after_preprocessing)
-
-#         # Predict flood risk probability
-#         pred_prob = model.predict(model_input)[0][0]
-#         pred_class = int(pred_prob >= 0.5)
-
-#         st.markdown("---")
-#         st.subheader("Prediction Result:")
-#         risk_label = "High Flood Risk" if pred_class == 1 else "Low Flood Risk"
-#         risk_color = "red" if pred_class == 1 else "green"
-#         st.markdown(f"<h2 style='color:{risk_color};'>{risk_label}</h2>", unsafe_allow_html=True)
-#         st.write(f"Flood Risk Probability: {pred_prob:.2%}")
+# --- Prediction Logic ---
 if predict_button:
     if model is None or preprocessor is None:
         st.error("Model or preprocessor not loaded properly.")
     else:
-        # Prepare input features dictionary
+        # Base input
         input_data = {
             'rainfall_mm': rainfall_mm,
             'temperature_C': temperature_C,
             'soil_moisture': soil_moisture,
             'river_level_m': river_level_m,
             'current_dam_level_m': current_dam_level_m,
-            'danger_level_m': 10.0,  # placeholder, ideally user input or computed
+            'danger_level_m': 10.0,  # assumed constant
             'release_status': release_status,
             'district': selected_district,
             'river': selected_river
         }
 
-        # Correct lag feature generation for lag1, lag2, lag3 explicitly
-        for i in range(1, 4):  # lag1 to lag3 inclusive
+        # Add lag features
+        for i in range(1, 4):
             input_data[f'rainfall_mm_lag{i}'] = rainfall_mm
             input_data[f'temperature_C_lag{i}'] = temperature_C
             input_data[f'soil_moisture_lag{i}'] = soil_moisture
             input_data[f'river_level_m_lag{i}'] = river_level_m
             input_data[f'current_dam_level_m_lag{i}'] = current_dam_level_m
-        # release_status_lag1 only
         input_data['release_status_lag1'] = release_status
 
-        # Aggregate rainfall sums
+        # Rolling sum features
         input_data['rainfall_7day_sum'] = rainfall_mm * 7
         input_data['rainfall_15day_sum'] = rainfall_mm * 15
         input_data['rainfall_30day_sum'] = rainfall_mm * 30
@@ -604,29 +769,19 @@ if predict_button:
         input_data['month_sin'] = np.sin(2 * np.pi * month / 12)
         input_data['month_cos'] = np.cos(2 * np.pi * month / 12)
 
-        # Ensure order and keys match exactly the preprocessor expected columns
-        current_features_raw = {k: input_data[k] for k in numerical_features + categorical_features}
-        input_df = pd.DataFrame([current_features_raw])
-
-        st.write("Input DataFrame columns:", input_df.columns.tolist())
-        st.write("Input DataFrame shape:", input_df.shape)
-
+        # DataFrame and preprocessing
+        raw_df = pd.DataFrame([input_data])
         try:
-            processed_input = preprocessor.transform(input_df)
-            processed_input_df = pd.DataFrame(processed_input, columns=all_feature_names)
+            processed_input = preprocessor.transform(raw_df)
+            processed_df = pd.DataFrame(processed_input, columns=all_feature_names)
         except Exception as e:
             st.error(f"Error during preprocessing: {e}")
             st.stop()
 
-        st.write("Processed DataFrame shape:", processed_input_df.shape)
+        # Reshape for GRU model
+        model_input = np.repeat(processed_df.values, N_TIMESTEPS, axis=0).reshape(1, N_TIMESTEPS, -1)
 
-        # Prepare input for GRU model: repeat row for N_TIMESTEPS to create 3D input
-        num_features_after_preprocessing = processed_input_df.shape[1]
-        model_input = np.repeat(processed_input_df.values, N_TIMESTEPS, axis=0).reshape(1, N_TIMESTEPS, num_features_after_preprocessing)
-
-        st.write("Model input shape:", model_input.shape)
-
-        # Prediction
+        # Predict
         pred_prob = model.predict(model_input)[0][0]
         pred_class = int(pred_prob >= 0.5)
 
@@ -636,3 +791,4 @@ if predict_button:
         risk_color = "red" if pred_class == 1 else "green"
         st.markdown(f"<h2 style='color:{risk_color};'>{risk_label}</h2>", unsafe_allow_html=True)
         st.write(f"Flood Risk Probability: {pred_prob:.2%}")
+
