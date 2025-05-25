@@ -769,17 +769,29 @@ if predict_button:
         input_data['month_sin'] = np.sin(2 * np.pi * month / 12)
         input_data['month_cos'] = np.cos(2 * np.pi * month / 12)
 
+        
         # DataFrame and preprocessing
         raw_df = pd.DataFrame([input_data])
         try:
             processed_input = preprocessor.transform(raw_df)
-            processed_df = pd.DataFrame(processed_input, columns=all_feature_names)
         except Exception as e:
             st.error(f"Error during preprocessing: {e}")
             st.stop()
 
         # Reshape for GRU model
-        model_input = np.repeat(processed_df.values, N_TIMESTEPS, axis=0).reshape(1, N_TIMESTEPS, -1)
+        model_input = np.repeat(processed_input, N_TIMESTEPS, axis=0).reshape(1, N_TIMESTEPS, -1)
+
+        # raw_df = pd.DataFrame([input_data])
+        # try:
+        #     processed_input = preprocessor.transform(raw_df)
+        #     processed_df = pd.DataFrame(processed_input, columns=all_feature_names)
+        # except Exception as e:
+        #     st.error(f"Error during preprocessing: {e}")
+        #     st.stop()
+
+        # # Reshape for GRU model
+        # model_input = np.repeat(processed_df.values, N_TIMESTEPS, axis=0).reshape(1, N_TIMESTEPS, -1)
+        
 
         # Predict
         pred_prob = model.predict(model_input)[0][0]
