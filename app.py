@@ -208,6 +208,100 @@
 #         st.error(f"Error during model prediction. Please check inputs or model integrity. Error: {e}")
 
 
+# import streamlit as st
+# import pandas as pd
+# import numpy as np
+# import joblib
+# import tensorflow as tf
+# from datetime import datetime
+
+# # Constants
+# N_TIMESTEPS = 1  # Use 1 if you're predicting from a single timestep
+
+# # Load the GRU model and preprocessor
+# @st.cache_resource
+# def load_model():
+#     try:
+#         model = tf.keras.models.load_model("gru_flood_model.h5")
+#         preprocessor = joblib.load("preprocessor.pkl")
+#         return model, preprocessor
+#     except Exception as e:
+#         st.error(f"Failed to load model or preprocessor: {e}")
+#         return None, None
+
+# model, preprocessor = load_model()
+
+# # Streamlit UI
+# st.set_page_config(page_title="Flood Risk Predictor", layout="centered")
+# st.title("🌊 Flood Risk Prediction App")
+# st.markdown("Enter weather and environmental conditions to assess flood risk.")
+
+# # User Inputs
+# col1, col2 = st.columns(2)
+# with col1:
+#     temperature = st.number_input("Temperature (°C)", value=30.0)
+#     humidity = st.number_input("Humidity (%)", value=70.0)
+#     wind_speed = st.number_input("Wind Speed (km/h)", value=15.0)
+#     pressure = st.number_input("Pressure (hPa)", value=1010.0)
+#     elevation = st.number_input("Elevation (m)", value=50.0)
+# with col2:
+#     rainfall = st.number_input("Rainfall (mm)", value=20.0)
+#     soil_moisture = st.number_input("Soil Moisture (%)", value=45.0)
+#     river_level = st.number_input("River Water Level (m)", value=5.0)
+#     vegetation = st.number_input("Vegetation Index (NDVI)", value=0.5)
+#     current_time = st.time_input("Time", value=datetime.now().time())
+#     current_date = st.date_input("Date", value=datetime.today())
+
+# predict_button = st.button("Predict Flood Risk")
+
+# if predict_button and model is not None and preprocessor is not None:
+#     # 1. Create input dictionary
+#     input_data = {
+#         'temperature': temperature,
+#         'humidity': humidity,
+#         'wind_speed': wind_speed,
+#         'pressure': pressure,
+#         'rainfall': rainfall,
+#         'soil_moisture': soil_moisture,
+#         'river_level': river_level,
+#         'vegetation_index': vegetation,
+#         'elevation': elevation,
+#     }
+
+#     # 2. Add cyclical time features
+#     day_of_year = current_date.timetuple().tm_yday
+#     month = current_date.month
+#     input_data['day_of_year_sin'] = np.sin(2 * np.pi * day_of_year / 365.0)
+#     input_data['day_of_year_cos'] = np.cos(2 * np.pi * day_of_year / 365.0)
+#     input_data['month_sin'] = np.sin(2 * np.pi * month / 12.0)
+#     input_data['month_cos'] = np.cos(2 * np.pi * month / 12.0)
+
+#     # 3. Create DataFrame
+#     input_df = pd.DataFrame([input_data])
+
+#     # 4. Preprocess and reshape
+#     try:
+#         transformed_input = preprocessor.transform(input_df)
+#         reshaped_input = transformed_input.reshape((1, N_TIMESTEPS, -1))
+
+#         # 5. Predict
+#         prediction = model.predict(reshaped_input)
+#         flood_risk = prediction[0][0]
+
+#         # 6. Display result
+#         st.subheader("🔍 Prediction Result")
+#         if flood_risk > 0.5:
+#             st.error(f"⚠️ High Flood Risk Detected: **{flood_risk:.2f}**")
+#         else:
+#             st.success(f"✅ Low Flood Risk: **{flood_risk:.2f}**")
+
+#     except Exception as e:
+#         st.error(f"Prediction failed: {e}")
+
+# elif predict_button:
+#     st.warning("Please ensure the model and preprocessor files are present in the app folder.")
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -222,7 +316,7 @@ N_TIMESTEPS = 1  # Use 1 if you're predicting from a single timestep
 @st.cache_resource
 def load_model():
     try:
-        model = tf.keras.models.load_model("gru_flood_model.h5")
+        model = tf.keras.models.load_model("gru_flood_model.h5")  # <-- load .h5 here
         preprocessor = joblib.load("preprocessor.pkl")
         return model, preprocessor
     except Exception as e:
@@ -300,4 +394,5 @@ if predict_button and model is not None and preprocessor is not None:
 
 elif predict_button:
     st.warning("Please ensure the model and preprocessor files are present in the app folder.")
+
 
