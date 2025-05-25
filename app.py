@@ -222,7 +222,7 @@ N_TIMESTEPS = 1  # Use 1 if you're predicting from a single timestep
 @st.cache_resource
 def load_model():
     try:
-        model = tf.keras.models.load_model("gru_flood_model.keras")
+        model = tf.keras.models.load_model("gru_flood_model.h5")
         preprocessor = joblib.load("preprocessor.pkl")
         return model, preprocessor
     except Exception as e:
