@@ -451,14 +451,24 @@ numerical_features = [
 ]
 categorical_features = ['district', 'river']
 
+# if preprocessor:
+#     # Set categories explicitly for OneHotEncoder to avoid mismatch
+#     preprocessor.named_transformers_['cat'].categories_ = [unique_districts, unique_rivers]
+#     # Get OneHotEncoder feature names
+#     ohe_feature_names = preprocessor.named_transformers_['cat'].get_feature_names_out(categorical_features)
+#     all_feature_names = numerical_features + list(ohe_feature_names)
+# else:
+#     all_feature_names = []
+
 if preprocessor:
-    # Set categories explicitly for OneHotEncoder to avoid mismatch
-    preprocessor.named_transformers_['cat'].categories_ = [unique_districts, unique_rivers]
-    # Get OneHotEncoder feature names
-    ohe_feature_names = preprocessor.named_transformers_['cat'].get_feature_names_out(categorical_features)
+    cat_transformer = preprocessor.named_transformers_['cat']
+    # Don't override categories manually
+    # Just use the original fitted categories and get feature names
+    ohe_feature_names = cat_transformer.get_feature_names_out(categorical_features)
     all_feature_names = numerical_features + list(ohe_feature_names)
 else:
     all_feature_names = []
+
 
 # --- Streamlit UI ---
 st.title("Uttar Pradesh Flood Risk Predictor 🌊")
