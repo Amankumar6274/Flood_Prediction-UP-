@@ -35,17 +35,72 @@ river_level = st.sidebar.slider("River Level (m)", 50.0, 110.0, 85.0)
 dam_level = st.sidebar.slider("Dam Level (m)", 30.0, 100.0, 70.0)
 soil_moisture = st.sidebar.slider("Soil Moisture", 0.0, 1.0, 0.5)
 
+import numpy as np
+import pandas as pd
+from datetime import datetime
+
+# Inside your Streamlit app, replace your current sidebar prediction code with this:
+
 if st.sidebar.button("Predict Flood"):
-    input_df = pd.DataFrame([{
+    # Step 1: Base input features from user
+    input_dict = {
         'rainfall_mm': rainfall,
         'temperature_C': temperature,
         'river_level_m': river_level,
         'current_dam_level_m': dam_level,
-        'soil_moisture': soil_moisture
-    }])
+        'soil_moisture': soil_moisture,
+    }
+    
+    # Step 2: Add engineered date features (day_sin, day_cos)
+    today = datetime.today()
+    day_of_year = today.timetuple().tm_yday
+    input_dict['day_sin'] = np.sin(2 * np.pi * day_of_year / 365)
+    input_dict['day_cos'] = np.cos(2 * np.pi * day_of_year / 365)
+
+    # Step 3: Prepare one-hot encoding for district to match model's expected features
+    # Get all district columns model expects from scaler
+    expected_features = scaler.feature_names_in_
+    district_cols = [col for col in expected_features if col.startswith('district_')]
+
+    # Initialize all district one-hot columns as 0
+    for col in district_cols:
+        input_dict[col] = 0
+
+    # Set the user's district column to 1 if it exists
+    district_col_name = f'district_{district}'
+    if district_col_name in district_cols:
+        input_dict[district_col_name] = 1
+
+    # Step 4: If model expects other one-hot columns (e.g. river, season), add them here similarly
+    # For example (adjust according to your feature names):
+    # for river_col in [col for col in expected_features if col.startswith('river_')]:
+    #     input_dict[river_col] = 0
+    # river_col_name = f'river_{user_selected_river}'
+    # if river_col_name in expected_features:
+    #     input_dict[river_col_name] = 1
+
+    # Step 5: Create DataFrame in the exact feature order
+    input_df = pd.DataFrame([input_dict], columns=expected_features)
+
+    # Step 6: Scale and predict
     scaled = scaler.transform(input_df)
     result = model.predict(scaled)[0]
+
+    # Show result
     st.sidebar.success("🌊 Flood Expected!" if result == 1 else "✅ No Flood Risk")
+
+
+# if st.sidebar.button("Predict Flood"):
+#     input_df = pd.DataFrame([{
+#         'rainfall_mm': rainfall,
+#         'temperature_C': temperature,
+#         'river_level_m': river_level,
+#         'current_dam_level_m': dam_level,
+#         'soil_moisture': soil_moisture
+#     }])
+#     scaled = scaler.transform(input_df)
+#     result = model.predict(scaled)[0]
+#     st.sidebar.success("🌊 Flood Expected!" if result == 1 else "✅ No Flood Risk")
 
 # -------- Main Tabs --------
 tab1, tab2, tab3 = st.tabs(["📊 Trends", "🗂 Bulk Prediction", "🗺 Map View"])
