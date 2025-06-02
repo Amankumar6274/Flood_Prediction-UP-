@@ -3,7 +3,23 @@ import pandas as pd
 import streamlit as st
 import joblib
 
-# ---------- Preprocessing Function ----------
+# === Load trained model and scaler ===
+model = joblib.load("flood_rf_model.pkl")
+scaler = joblib.load("flood_scaler.pkl")
+
+# === Define training columns exactly as in training ===
+training_columns = [
+    'rainfall_mm', 'temperature_c', 'water_level_m', 'soil_saturation', 'urbanization_index',
+    # Districts (District_2 to District_20)
+    *['district_District_' + str(i) for i in range(2, 21)],
+    # Rivers (River_2 to River_5)
+    *['river_River_' + str(i) for i in range(2, 6)],
+    # Seasons (exclude Monsoon)
+    'season_Pre-monsoon', 'season_Summer', 'season_Winter',
+    'day_sin', 'day_cos'
+]
+
+# === Preprocessing function ===
 def preprocess_inputs(input_df):
     districts = ['District_' + str(i) for i in range(1, 21)]
     rivers = ['River_' + str(i) for i in range(1, 6)]
@@ -22,7 +38,6 @@ def preprocess_inputs(input_df):
     season_dummies = season_dummies.reindex(columns=season_cols, fill_value=0)
 
     input_df = input_df.drop(['district', 'river', 'season'], axis=1)
-
     df_final = pd.concat([input_df, district_dummies, river_dummies, season_dummies], axis=1)
 
     df_final['day_sin'] = np.sin(2 * np.pi * df_final['day_of_year'] / 365)
@@ -32,24 +47,7 @@ def preprocess_inputs(input_df):
     df_final = df_final.reindex(columns=training_columns, fill_value=0)
     return df_final
 
-# ---------- Load Model, Scaler, and Training Columns ----------
-model = joblib.load("flood_rf_model.pkl")
-scaler = joblib.load("flood_scaler.pkl")
-
-# Replace with your actual training column names
-training_columns = [
-    'rainfall_mm', 'temperature_c', 'water_level_m', 'soil_saturation', 'urbanization_index',
-    'district_District_2', 'district_District_3', 'district_District_4', 'district_District_5',
-    'district_District_6', 'district_District_7', 'district_District_8', 'district_District_9',
-    'district_District_10', 'district_District_11', 'district_District_12', 'district_District_13',
-    'district_District_14', 'district_District_15', 'district_District_16', 'district_District_17',
-    'district_District_18', 'district_District_19', 'district_District_20',
-    'river_River_2', 'river_River_3', 'river_River_4', 'river_River_5',
-    'season_Pre-monsoon', 'season_Summer', 'season_Winter',
-    'day_sin', 'day_cos'
-]
-
-# ---------- Streamlit UI ----------
+# === Streamlit UI ===
 st.title("🌊 Flood Risk Predictor")
 
 input_mode = st.radio("Choose input mode:", ["Single Input", "Bulk CSV"])
@@ -80,17 +78,17 @@ if input_mode == "Single Input":
     input_df = pd.DataFrame(input_dict)
     processed = preprocess_inputs(input_df)
     scaled = scaler.transform(processed)
-    prediction = model.predict(scaled)[0]
+    pred = model.predict(scaled)[0]
 
-    st.success("🚨 Flood Expected!" if prediction == 1 else "✅ No Flood Risk")
+    st.success("🚨 Flood Expected!" if pred == 1 else "✅ No Flood Risk")
 
 else:
-    uploaded_file = st.file_uploader("Upload CSV file with columns like 'district', 'river', 'season', etc.", type="csv")
+    uploaded_file = st.file_uploader("Upload CSV with required columns", type="csv")
     if uploaded_file:
         df = pd.read_csv(uploaded_file)
-        df_preprocessed = preprocess_inputs(df)
-        df_scaled = scaler.transform(df_preprocessed)
-        predictions = model.predict(df_scaled)
+        processed = preprocess_inputs(df)
+        scaled = scaler.transform(processed)
+        predictions = model.predict(scaled)
         df['Predicted Flood Event'] = predictions
         st.write(df)
-        st.download_button("Download Predictions", df.to_csv(index=False), "flood_predictions.csv", "text/csv")
+        st.download_button("Download Predictions", df.to_csv(index=False), "predictions.csv", "text/csv")
