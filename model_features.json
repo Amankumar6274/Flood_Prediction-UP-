@@ -1,0 +1,1 @@
+["rainfall_mm", "temperature_C", "soil_moisture", "river_level_m", "current_dam_level_m", "danger_level_m", "release_status", "rainfall_mm_lag1", "rainfall_mm_roll7", "river_level_m_lag1", "river_level_m_roll7"]
