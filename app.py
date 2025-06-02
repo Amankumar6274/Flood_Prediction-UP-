@@ -1,181 +1,96 @@
-import streamlit as st
-import pandas as pd
 import numpy as np
-import pydeck as pdk
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
+import pandas as pd
+import streamlit as st
 import joblib
 
-st.set_page_config(page_title="Flood Prediction Dashboard", layout="wide")
+# ---------- Preprocessing Function ----------
+def preprocess_inputs(input_df):
+    districts = ['District_' + str(i) for i in range(1, 21)]
+    rivers = ['River_' + str(i) for i in range(1, 6)]
+    seasons = ['Monsoon', 'Winter', 'Summer', 'Pre-monsoon']
 
-# Load data and model
-@st.cache_data
-def load_data():
-    df = pd.read_csv("flood_dataset_realistic_final.csv", parse_dates=['date'])
-    return df
+    district_dummies = pd.get_dummies(input_df['district'], prefix='district')
+    river_dummies = pd.get_dummies(input_df['river'], prefix='river')
+    season_dummies = pd.get_dummies(input_df['season'], prefix='season')
 
-@st.cache_resource
-def load_model():
-    model = joblib.load("flood_rf_model.pkl")
-    scaler = joblib.load("flood_scaler.pkl")
-    return model, scaler
+    district_cols = ['district_' + d for d in districts[1:]]
+    river_cols = ['river_' + r for r in rivers[1:]]
+    season_cols = ['season_' + s for s in seasons if s != 'Monsoon']
 
-df = load_data()
-model, scaler = load_model()
+    district_dummies = district_dummies.reindex(columns=district_cols, fill_value=0)
+    river_dummies = river_dummies.reindex(columns=river_cols, fill_value=0)
+    season_dummies = season_dummies.reindex(columns=season_cols, fill_value=0)
 
-# -------- Sidebar Input --------
-st.sidebar.title("🛠️ Predict Flood from Inputs")
-st.sidebar.markdown("Enter environmental parameters:")
+    input_df = input_df.drop(['district', 'river', 'season'], axis=1)
 
-district = st.sidebar.selectbox("District", sorted(df['district'].unique()))
-rainfall = st.sidebar.slider("Rainfall (mm)", 0.0, 300.0, 100.0)
-temperature = st.sidebar.slider("Temperature (°C)", 10.0, 45.0, 28.0)
-river_level = st.sidebar.slider("River Level (m)", 50.0, 110.0, 85.0)
-dam_level = st.sidebar.slider("Dam Level (m)", 30.0, 100.0, 70.0)
-soil_moisture = st.sidebar.slider("Soil Moisture", 0.0, 1.0, 0.5)
+    df_final = pd.concat([input_df, district_dummies, river_dummies, season_dummies], axis=1)
 
-import numpy as np
-import pandas as pd
-from datetime import datetime
+    df_final['day_sin'] = np.sin(2 * np.pi * df_final['day_of_year'] / 365)
+    df_final['day_cos'] = np.cos(2 * np.pi * df_final['day_of_year'] / 365)
+    df_final.drop(['day_of_year'], axis=1, inplace=True)
 
-# Inside your Streamlit app, replace your current sidebar prediction code with this:
+    df_final = df_final.reindex(columns=training_columns, fill_value=0)
+    return df_final
 
-if st.sidebar.button("Predict Flood"):
-    # Step 1: Base input features from user
+# ---------- Load Model, Scaler, and Training Columns ----------
+model = joblib.load("flood_rf_model.pkl")
+scaler = joblib.load("flood_scaler.pkl")
+
+# Replace with your actual training column names
+training_columns = [
+    'rainfall_mm', 'temperature_c', 'water_level_m', 'soil_saturation', 'urbanization_index',
+    'district_District_2', 'district_District_3', 'district_District_4', 'district_District_5',
+    'district_District_6', 'district_District_7', 'district_District_8', 'district_District_9',
+    'district_District_10', 'district_District_11', 'district_District_12', 'district_District_13',
+    'district_District_14', 'district_District_15', 'district_District_16', 'district_District_17',
+    'district_District_18', 'district_District_19', 'district_District_20',
+    'river_River_2', 'river_River_3', 'river_River_4', 'river_River_5',
+    'season_Pre-monsoon', 'season_Summer', 'season_Winter',
+    'day_sin', 'day_cos'
+]
+
+# ---------- Streamlit UI ----------
+st.title("🌊 Flood Risk Predictor")
+
+input_mode = st.radio("Choose input mode:", ["Single Input", "Bulk CSV"])
+
+if input_mode == "Single Input":
+    district = st.selectbox("District", ['District_' + str(i) for i in range(1, 21)])
+    river = st.selectbox("River", ['River_' + str(i) for i in range(1, 6)])
+    season = st.selectbox("Season", ['Monsoon', 'Winter', 'Summer', 'Pre-monsoon'])
+    rainfall = st.slider("Rainfall (mm)", 0, 300, 100)
+    temperature = st.slider("Temperature (°C)", 10, 45, 28)
+    water_level = st.slider("Water Level (m)", 0, 15, 5)
+    soil_sat = st.slider("Soil Saturation", 0.0, 1.0, 0.5)
+    urban_idx = st.slider("Urbanization Index", 0.0, 1.0, 0.5)
+    day_of_year = st.slider("Day of Year", 1, 365, 180)
+
     input_dict = {
-        'rainfall_mm': rainfall,
-        'temperature_C': temperature,
-        'river_level_m': river_level,
-        'current_dam_level_m': dam_level,
-        'soil_moisture': soil_moisture,
+        'district': [district],
+        'river': [river],
+        'season': [season],
+        'rainfall_mm': [rainfall],
+        'temperature_c': [temperature],
+        'water_level_m': [water_level],
+        'soil_saturation': [soil_sat],
+        'urbanization_index': [urban_idx],
+        'day_of_year': [day_of_year]
     }
-    
-    # Step 2: Add engineered date features (day_sin, day_cos)
-    today = datetime.today()
-    day_of_year = today.timetuple().tm_yday
-    input_dict['day_sin'] = np.sin(2 * np.pi * day_of_year / 365)
-    input_dict['day_cos'] = np.cos(2 * np.pi * day_of_year / 365)
 
-    # Step 3: Prepare one-hot encoding for district to match model's expected features
-    # Get all district columns model expects from scaler
-    expected_features = scaler.feature_names_in_
-    district_cols = [col for col in expected_features if col.startswith('district_')]
+    input_df = pd.DataFrame(input_dict)
+    processed = preprocess_inputs(input_df)
+    scaled = scaler.transform(processed)
+    prediction = model.predict(scaled)[0]
 
-    # Initialize all district one-hot columns as 0
-    for col in district_cols:
-        input_dict[col] = 0
+    st.success("🚨 Flood Expected!" if prediction == 1 else "✅ No Flood Risk")
 
-    # Set the user's district column to 1 if it exists
-    district_col_name = f'district_{district}'
-    if district_col_name in district_cols:
-        input_dict[district_col_name] = 1
-
-    # Step 4: If model expects other one-hot columns (e.g. river, season), add them here similarly
-    # For example (adjust according to your feature names):
-    # for river_col in [col for col in expected_features if col.startswith('river_')]:
-    #     input_dict[river_col] = 0
-    # river_col_name = f'river_{user_selected_river}'
-    # if river_col_name in expected_features:
-    #     input_dict[river_col_name] = 1
-
-    # Step 5: Create DataFrame in the exact feature order
-    input_df = pd.DataFrame([input_dict], columns=expected_features)
-
-    # Step 6: Scale and predict
-    scaled = scaler.transform(input_df)
-    result = model.predict(scaled)[0]
-
-    # Show result
-    st.sidebar.success("🌊 Flood Expected!" if result == 1 else "✅ No Flood Risk")
-
-
-# if st.sidebar.button("Predict Flood"):
-#     input_df = pd.DataFrame([{
-#         'rainfall_mm': rainfall,
-#         'temperature_C': temperature,
-#         'river_level_m': river_level,
-#         'current_dam_level_m': dam_level,
-#         'soil_moisture': soil_moisture
-#     }])
-#     scaled = scaler.transform(input_df)
-#     result = model.predict(scaled)[0]
-#     st.sidebar.success("🌊 Flood Expected!" if result == 1 else "✅ No Flood Risk")
-
-# -------- Main Tabs --------
-tab1, tab2, tab3 = st.tabs(["📊 Trends", "🗂 Bulk Prediction", "🗺 Map View"])
-
-# --------- Tab 1: Trends ---------
-with tab1:
-    st.subheader("📈 Time Series Trend of Floods")
-    flood_by_month = df[df['flood_event'] == 1].groupby(df['date'].dt.to_period("M")).size()
-    st.line_chart(flood_by_month)
-
-    st.subheader("📍 District-wise Flood Frequency")
-    flood_dist = df[df['flood_event'] == 1]['district'].value_counts()
-    st.bar_chart(flood_dist)
-
-# --------- Tab 2: Bulk Prediction ---------
-with tab2:
-    st.subheader("📤 Upload CSV for Bulk Flood Prediction")
-
-    uploaded_file = st.file_uploader("Upload CSV with required columns", type=["csv"])
+else:
+    uploaded_file = st.file_uploader("Upload CSV file with columns like 'district', 'river', 'season', etc.", type="csv")
     if uploaded_file:
-        csv_df = pd.read_csv(uploaded_file)
-        try:
-            input_data = csv_df[[
-                'rainfall_mm', 'temperature_C', 'river_level_m',
-                'current_dam_level_m', 'soil_moisture'
-            ]]
-            input_scaled = scaler.transform(input_data)
-            csv_df['flood_prediction'] = model.predict(input_scaled)
-            st.success("✅ Prediction complete!")
-            st.dataframe(csv_df.head())
-
-            csv_download = csv_df.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Predictions", csv_download, "flood_predictions.csv", "text/csv")
-        except Exception as e:
-            st.error("CSV missing required columns. Please include: rainfall_mm, temperature_C, river_level_m, current_dam_level_m, soil_moisture")
-
-# --------- Tab 3: Map ---------
-with tab3:
-    st.subheader("🗺 Map of Historical Flood Events")
-
-    df_map = df.copy()
-    # Fake coordinates for illustration (you should replace with actual lat/lon per district)
-    district_coords = {
-        'Gorakhpur': (26.76, 83.37),
-        'Ballia': (25.76, 84.15),
-        'Bahraich': (27.57, 81.59),
-        'Gonda': (27.13, 81.96),
-        'Lakhimpur Kheri': (27.94, 80.78),
-        'Faizabad': (26.77, 82.15),
-        'Basti': (26.79, 82.73),
-        'Mau': (25.95, 83.56),
-        'Sitapur': (27.57, 80.68),
-        'Barabanki': (26.93, 81.20)
-    }
-    df_map['lat'] = df_map['district'].map(lambda x: district_coords.get(x, (0, 0))[0])
-    df_map['lon'] = df_map['district'].map(lambda x: district_coords.get(x, (0, 0))[1])
-    df_map = df_map[df_map['flood_event'] == 1]
-
-    st.pydeck_chart(pdk.Deck(
-        map_style="mapbox://styles/mapbox/light-v9",
-        initial_view_state=pdk.ViewState(
-            latitude=26.8,
-            longitude=82.5,
-            zoom=6,
-            pitch=50,
-        ),
-        layers=[
-            pdk.Layer(
-                'ScatterplotLayer',
-                data=df_map,
-                get_position='[lon, lat]',
-                get_color='[200, 30, 0, 160]',
-                get_radius=5000,
-                pickable=True
-            )
-        ],
-        tooltip={"text": "District: {district}\nDate: {date}\nRainfall: {rainfall_mm}mm"}
-    ))
+        df = pd.read_csv(uploaded_file)
+        df_preprocessed = preprocess_inputs(df)
+        df_scaled = scaler.transform(df_preprocessed)
+        predictions = model.predict(df_scaled)
+        df['Predicted Flood Event'] = predictions
+        st.write(df)
+        st.download_button("Download Predictions", df.to_csv(index=False), "flood_predictions.csv", "text/csv")
