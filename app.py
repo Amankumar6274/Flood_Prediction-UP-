@@ -1,94 +1,41 @@
-import numpy as np
-import pandas as pd
 import streamlit as st
+import numpy as np
 import joblib
 
-# === Load trained model and scaler ===
-model = joblib.load("flood_rf_model.pkl")
+# Load model and scaler
+model = joblib.load("flood_xgb_model.pkl")
 scaler = joblib.load("flood_scaler.pkl")
 
-# === Define training columns exactly as in training ===
-training_columns = [
-    'rainfall_mm', 'temperature_c', 'water_level_m', 'soil_saturation', 'urbanization_index',
-    # Districts (District_2 to District_20)
-    *['district_District_' + str(i) for i in range(2, 21)],
-    # Rivers (River_2 to River_5)
-    *['river_River_' + str(i) for i in range(2, 6)],
-    # Seasons (exclude Monsoon)
-    'season_Pre-monsoon', 'season_Summer', 'season_Winter',
-    'day_sin', 'day_cos'
-]
+st.set_page_config(page_title="Flood Prediction App", layout="centered")
 
-# === Preprocessing function ===
-def preprocess_inputs(input_df):
-    districts = ['District_' + str(i) for i in range(1, 21)]
-    rivers = ['River_' + str(i) for i in range(1, 6)]
-    seasons = ['Monsoon', 'Winter', 'Summer', 'Pre-monsoon']
+st.title("🌊 Flood Event Prediction")
 
-    district_dummies = pd.get_dummies(input_df['district'], prefix='district')
-    river_dummies = pd.get_dummies(input_df['river'], prefix='river')
-    season_dummies = pd.get_dummies(input_df['season'], prefix='season')
+st.markdown("Enter environmental and weather details to predict the likelihood of a flood.")
 
-    district_cols = ['district_' + d for d in districts[1:]]
-    river_cols = ['river_' + r for r in rivers[1:]]
-    season_cols = ['season_' + s for s in seasons if s != 'Monsoon']
+# Input fields for each feature
+rainfall = st.number_input("Rainfall (mm)", min_value=0.0, value=100.0)
+river_level = st.number_input("River Level (m)", min_value=0.0, value=5.0)
+temperature = st.number_input("Temperature (°C)", value=28.0)
+humidity = st.number_input("Humidity (%)", min_value=0.0, max_value=100.0, value=75.0)
+wind_speed = st.number_input("Wind Speed (km/h)", min_value=0.0, value=10.0)
+soil_saturation = st.number_input("Soil Saturation (%)", min_value=0.0, max_value=100.0, value=60.0)
+past_flood = st.selectbox("Was there a flood in the past week?", ["No", "Yes"])
+elevation = st.number_input("Elevation (meters)", value=150.0)
 
-    district_dummies = district_dummies.reindex(columns=district_cols, fill_value=0)
-    river_dummies = river_dummies.reindex(columns=river_cols, fill_value=0)
-    season_dummies = season_dummies.reindex(columns=season_cols, fill_value=0)
+# Convert categorical input
+past_flood_binary = 1 if past_flood == "Yes" else 0
 
-    input_df = input_df.drop(['district', 'river', 'season'], axis=1)
-    df_final = pd.concat([input_df, district_dummies, river_dummies, season_dummies], axis=1)
+# Prepare input for model
+input_features = np.array([[rainfall, river_level, temperature, humidity,
+                            wind_speed, soil_saturation, past_flood_binary, elevation]])
+input_scaled = scaler.transform(input_features)
 
-    df_final['day_sin'] = np.sin(2 * np.pi * df_final['day_of_year'] / 365)
-    df_final['day_cos'] = np.cos(2 * np.pi * df_final['day_of_year'] / 365)
-    df_final.drop(['day_of_year'], axis=1, inplace=True)
+# Predict button
+if st.button("Predict"):
+    prediction = model.predict(input_scaled)[0]
+    prob = model.predict_proba(input_scaled)[0][prediction]
 
-    df_final = df_final.reindex(columns=training_columns, fill_value=0)
-    return df_final
-
-# === Streamlit UI ===
-st.title("🌊 Flood Risk Predictor")
-
-input_mode = st.radio("Choose input mode:", ["Single Input", "Bulk CSV"])
-
-if input_mode == "Single Input":
-    district = st.selectbox("District", ['District_' + str(i) for i in range(1, 21)])
-    river = st.selectbox("River", ['River_' + str(i) for i in range(1, 6)])
-    season = st.selectbox("Season", ['Monsoon', 'Winter', 'Summer', 'Pre-monsoon'])
-    rainfall = st.slider("Rainfall (mm)", 0, 300, 100)
-    temperature = st.slider("Temperature (°C)", 10, 45, 28)
-    water_level = st.slider("Water Level (m)", 0, 15, 5)
-    soil_sat = st.slider("Soil Saturation", 0.0, 1.0, 0.5)
-    urban_idx = st.slider("Urbanization Index", 0.0, 1.0, 0.5)
-    day_of_year = st.slider("Day of Year", 1, 365, 180)
-
-    input_dict = {
-        'district': [district],
-        'river': [river],
-        'season': [season],
-        'rainfall_mm': [rainfall],
-        'temperature_c': [temperature],
-        'water_level_m': [water_level],
-        'soil_saturation': [soil_sat],
-        'urbanization_index': [urban_idx],
-        'day_of_year': [day_of_year]
-    }
-
-    input_df = pd.DataFrame(input_dict)
-    processed = preprocess_inputs(input_df)
-    scaled = scaler.transform(processed)
-    pred = model.predict(scaled)[0]
-
-    st.success("🚨 Flood Expected!" if pred == 1 else "✅ No Flood Risk")
-
-else:
-    uploaded_file = st.file_uploader("Upload CSV with required columns", type="csv")
-    if uploaded_file:
-        df = pd.read_csv(uploaded_file)
-        processed = preprocess_inputs(df)
-        scaled = scaler.transform(processed)
-        predictions = model.predict(scaled)
-        df['Predicted Flood Event'] = predictions
-        st.write(df)
-        st.download_button("Download Predictions", df.to_csv(index=False), "predictions.csv", "text/csv")
+    if prediction == 1:
+        st.error(f"⚠️ Flood likely! (Confidence: {prob:.2%})")
+    else:
+        st.success(f"✅ No flood expected. (Confidence: {prob:.2%})")
