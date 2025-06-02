@@ -18,7 +18,7 @@ def load_data():
 @st.cache_resource
 def load_model():
     model = joblib.load("flood_rf_model.pkl")
-    scaler = joblib.load("scaler.pkl")
+    scaler = joblib.load("flood_scaler.pkl")
     return model, scaler
 
 df = load_data()
